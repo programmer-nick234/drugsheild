@@ -1,0 +1,22 @@
+{
+  "folders": [
+    {
+      "name": "Frontend (React Native)",
+      "path": "./frontend"
+    },
+    {
+      "name": "Backend (Django)", 
+      "path": "./backend"
+    }
+  ],
+  "settings": {
+    "typescript.preferences.rootUri": "frontend",
+    "eslint.workingDirectories": ["frontend"],
+    "python.defaultInterpreterPath": "backend/venv/bin/python",
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/.expo": true,
+      "**/__pycache__": true
+    }
+  }
+}

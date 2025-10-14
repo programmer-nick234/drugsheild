@@ -1,0 +1,24 @@
+{
+  "typescript.preferences.rootUri": "frontend",
+  "typescript.preferences.includePackageJsonAutoImports": "auto",
+  "typescript.suggest.autoImports": true,
+  "eslint.workingDirectories": ["frontend"],
+  "python.defaultInterpreterPath": "backend/venv/bin/python",
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/.expo": true,
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "backend/db.sqlite3": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.expo": true,
+    "**/__pycache__": true
+  },
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/.expo/**": true,
+    "**/__pycache__/**": true
+  }
+}
