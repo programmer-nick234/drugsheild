@@ -275,7 +275,7 @@ export default function HealthSummaryScreen() {
             <View style={styles.statsGrid}>
               <View style={styles.statItem}>
                 <ThemedText style={styles.statNumber}>{stats.totalChecks}</ThemedText>
-                <ThemedText style={styles.statLabel}>Total Checks</ThemedText>
+                <ThemedText style={styles.statLabel}>Total Chcks</ThemedText>
               </View>
               <View style={styles.statItem}>
                 <ThemedText style={[styles.statNumber, { color: '#4CAF50' }]}>{stats.riskChecks}</ThemedText>

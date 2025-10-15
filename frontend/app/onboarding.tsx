@@ -19,7 +19,7 @@ export default function OnboardingScreen() {
     allergies: '',
     diseases: '',
   });
-  
+
   const [errors, setErrors] = useState({
     name: '',
     age: '',
@@ -55,7 +55,7 @@ export default function OnboardingScreen() {
     if (!validateForm()) return;
 
     setLoading(true);
-    
+
     try {
       const profile: UserProfile = {
         name: formData.name.trim(),
@@ -66,7 +66,7 @@ export default function OnboardingScreen() {
 
       // Save to local storage
       await storageService.saveUserProfile(profile);
-      
+
       // Try to register with backend (optional)
       try {
         await healthApi.registerUser(profile);
@@ -76,10 +76,10 @@ export default function OnboardingScreen() {
 
       // Mark onboarding as completed
       await storageService.setOnboardingCompleted();
-      
+
       // Navigate to home
       router.replace('/home');
-      
+
     } catch (error) {
       console.error('Error saving profile:', error);
       Alert.alert('Error', 'Failed to save your profile. Please try again.');

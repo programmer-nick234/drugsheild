@@ -1,8 +1,8 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// API Configuration - Update with your Django backend URL
-const API_BASE_URL = __DEV__ ? 'http://10.30.203.192:8000/api' : 'https://your-production-api.com/api';
+// API Configuration - Django backend URL
+const API_BASE_URL = __DEV__ ? 'http://localhost:8000/api' : 'https://your-production-api.com/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -71,6 +71,22 @@ export interface RiskCheckResult {
   potential_reactions: string[];
   recommendations: string[];
   record_id: number;
+  ai_analysis?: string; // AI-powered analysis text
+  note?: string; // Fallback note when AI is unavailable
+}
+
+// AI-powered drug risk analysis result
+export interface DrugRiskAnalysisResult {
+  risk_level: 'minimal' | 'low' | 'medium' | 'high';
+  risk_description: string;
+  confidence_score: number;
+  allergy_matches?: string[];
+  recommendations: string[];
+  ai_analysis?: string;
+  generic_name?: string;
+  drug_class?: string;
+  common_uses?: string;
+  potential_reactions?: string[]; // For backward compatibility
 }
 
 // For backward compatibility
@@ -205,7 +221,7 @@ export const healthApi = {
       profile.medications = response.data.medications?.map((m: Medication) => m.name) || [];
       
       return profile;
-    } catch (error: any) {
+    } catch (error: any)  {
       throw new Error(error.response?.data?.error || 'Failed to fetch user profile');
     }
   },
@@ -229,6 +245,30 @@ export const healthApi = {
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Failed to check drug risk');
+    }
+  },
+
+  // AI-Powered Drug Risk Analysis
+  async analyzeDrugRisk(drugName: string, userAllergies?: string[]): Promise<DrugRiskAnalysisResult> {
+    try {
+      const response = await api.post('/ai/drug-risk-analysis/', {
+        drug_name: drugName,
+        user_allergies: userAllergies || []
+      });
+      return response.data;
+    } catch (error: any) {
+      // Fallback to regular risk check if AI endpoint fails
+      console.warn('AI analysis failed, falling back to regular risk check:', error.message);
+      const fallbackResult = await this.checkDrugRisk(drugName, userAllergies);
+      // Convert to AI format
+      return {
+        risk_level: fallbackResult.risk_level as 'minimal' | 'low' | 'medium' | 'high',
+        risk_description: `Risk level: ${fallbackResult.risk_level}`,
+        confidence_score: 0.7, // Default confidence
+        recommendations: fallbackResult.recommendations,
+        ai_analysis: fallbackResult.ai_analysis || fallbackResult.note,
+        potential_reactions: fallbackResult.potential_reactions
+      };
     }
   },
 

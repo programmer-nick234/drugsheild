@@ -14,6 +14,7 @@ from .serializers import (
     HealthAlertSerializer, RiskCheckRequestSerializer, SymptomAnalysisRequestSerializer,
     ChatRequestSerializer, HealthSummarySerializer
 )
+from .gemini_service import GeminiAIService
 import json
 import random
 
@@ -101,7 +102,7 @@ class HealthAlertViewSet(viewsets.ModelViewSet):
 @permission_classes([IsAuthenticated])
 def check_drug_risk(request):
     """
-    Check drug risk based on user allergies
+    Check drug risk based on user allergies using AI analysis
     """
     serializer = RiskCheckRequestSerializer(data=request.data)
     if serializer.is_valid():
@@ -110,53 +111,57 @@ def check_drug_risk(request):
         
         # Get user's known allergies from database
         user_allergy_objects = Allergy.objects.filter(user=request.user)
-        known_allergies = [allergy.name.lower() for allergy in user_allergy_objects]
+        known_allergies = [allergy.name for allergy in user_allergy_objects]
         
         # Combine with provided allergies
-        all_allergies = list(set(known_allergies + [allergy.lower() for allergy in user_allergies]))
+        all_allergies = list(set(known_allergies + user_allergies))
         
-        # Simple risk assessment logic (can be enhanced with AI/ML)
-        risk_level = 'low'
-        potential_reactions = []
-        recommendations = []
-        
-        # Check for common drug-allergy interactions
-        drug_lower = drug_name.lower()
-        
-        # Example risk assessments (this should be replaced with a proper drug database)
-        high_risk_combinations = {
-            'penicillin': ['penicillin', 'amoxicillin', 'ampicillin'],
-            'aspirin': ['aspirin', 'salicylate'],
-            'ibuprofen': ['ibuprofen', 'nsaid'],
-            'sulfa': ['sulfamethoxazole', 'sulfonamide']
-        }
-        
-        for allergy in all_allergies:
-            for drug_class, related_drugs in high_risk_combinations.items():
-                if allergy in drug_class or any(related in drug_lower for related in related_drugs):
-                    risk_level = 'high'
-                    potential_reactions.append(f'Allergic reaction to {drug_name} due to {allergy} allergy')
-                    recommendations.append(f'Avoid {drug_name}. Consult doctor for alternatives.')
-        
-        if risk_level == 'low':
-            recommendations.append('Low risk detected. Take as prescribed.')
-            recommendations.append('Monitor for any unusual symptoms.')
-        
-        # Save the risk check record
-        risk_record = RiskCheckRecord.objects.create(
-            user=request.user,
-            drug_name=drug_name,
-            risk_level=risk_level,
-            potential_reactions=potential_reactions,
-            recommendations='\n'.join(recommendations)
-        )
-        
-        return Response({
-            'risk_level': risk_level,
-            'potential_reactions': potential_reactions,
-            'recommendations': recommendations,
-            'record_id': risk_record.id
-        })
+        # Use AI for comprehensive drug risk analysis
+        try:
+            ai_service = GeminiAIService()
+            analysis_result = ai_service.analyze_drug_risk(drug_name, all_allergies)
+            
+            if analysis_result:
+                # Save the risk check record
+                risk_record = RiskCheckRecord.objects.create(
+                    user=request.user,
+                    drug_name=drug_name,
+                    risk_level=analysis_result['risk_level'],
+                    potential_reactions=analysis_result['potential_reactions'],
+                    recommendations='\n'.join(analysis_result['recommendations'])
+                )
+                
+                return Response({
+                    'risk_level': analysis_result['risk_level'],
+                    'potential_reactions': analysis_result['potential_reactions'],
+                    'recommendations': analysis_result['recommendations'],
+                    'ai_analysis': analysis_result.get('analysis', ''),
+                    'record_id': risk_record.id
+                })
+            else:
+                return Response({'error': 'Failed to analyze drug risk'}, status=500)
+                
+        except Exception as e:
+            # Fallback to basic analysis if AI fails
+            risk_level = 'medium'
+            potential_reactions = ['Consult healthcare provider for personalized risk assessment']
+            recommendations = ['Please consult with a healthcare professional before taking this medication']
+            
+            risk_record = RiskCheckRecord.objects.create(
+                user=request.user,
+                drug_name=drug_name,
+                risk_level=risk_level,
+                potential_reactions=potential_reactions,
+                recommendations='\n'.join(recommendations)
+            )
+            
+            return Response({
+                'risk_level': risk_level,
+                'potential_reactions': potential_reactions,
+                'recommendations': recommendations,
+                'record_id': risk_record.id,
+                'note': 'Basic analysis provided - AI temporarily unavailable'
+            })
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -165,53 +170,54 @@ def check_drug_risk(request):
 @permission_classes([IsAuthenticated])
 def analyze_symptoms(request):
     """
-    Analyze symptoms for potential allergic reactions or side effects
+    Analyze symptoms for potential allergic reactions or side effects using AI
     """
     serializer = SymptomAnalysisRequestSerializer(data=request.data)
     if serializer.is_valid():
         symptoms = serializer.validated_data['symptoms']
         medications = serializer.validated_data.get('current_medications', [])
         
-        # Simple symptom analysis logic (should be enhanced with AI/ML)
-        symptoms_lower = symptoms.lower()
-        
-        # Define symptom patterns
-        allergic_patterns = ['rash', 'hives', 'swelling', 'difficulty breathing', 'itching']
-        side_effect_patterns = ['nausea', 'dizziness', 'headache', 'fatigue', 'stomach pain']
-        
-        classification = 'unrelated'
-        confidence = 0.3
-        ai_analysis = "Basic symptom analysis performed."
-        recommendations = []
-        
-        # Check for allergic reaction patterns
-        allergic_score = sum(1 for pattern in allergic_patterns if pattern in symptoms_lower)
-        side_effect_score = sum(1 for pattern in side_effect_patterns if pattern in symptoms_lower)
-        
-        if allergic_score > 0:
-            classification = 'allergic_reaction'
-            confidence = min(0.9, 0.4 + (allergic_score * 0.15))
-            ai_analysis = f"Detected {allergic_score} allergic reaction indicators."
-            recommendations.append("Seek immediate medical attention if symptoms worsen.")
-            recommendations.append("Consider stopping any new medications.")
-        elif side_effect_score > 0:
-            classification = 'side_effect'
-            confidence = min(0.8, 0.3 + (side_effect_score * 0.15))
-            ai_analysis = f"Detected {side_effect_score} medication side effect indicators."
-            recommendations.append("Monitor symptoms and consult your doctor.")
-        else:
-            recommendations.append("Symptoms may be unrelated to allergies or medications.")
-            recommendations.append("Consult a healthcare provider if symptoms persist.")
-        
-        # Save the analysis
-        analysis = SymptomAnalysis.objects.create(
-            user=request.user,
-            symptoms=symptoms,
-            classification=classification,
-            confidence_score=confidence,
-            ai_analysis=ai_analysis,
-            recommendations='\n'.join(recommendations)
-        )
+        # Use AI for comprehensive symptom analysis
+        try:
+            ai_service = GeminiAIService()
+            analysis_result = ai_service.analyze_symptoms(symptoms, medications)
+            
+            if analysis_result:
+                # Save the analysis
+                analysis = SymptomAnalysis.objects.create(
+                    user=request.user,
+                    symptoms=symptoms,
+                    classification=analysis_result['classification'],
+                    confidence_score=analysis_result['confidence_score'],
+                    ai_analysis=analysis_result['analysis'],
+                    recommendations='\n'.join(analysis_result['recommendations'])
+                )
+                
+                return Response({
+                    'classification': analysis_result['classification'],
+                    'confidence_score': analysis_result['confidence_score'],
+                    'ai_analysis': analysis_result['analysis'],
+                    'recommendations': analysis_result['recommendations'],
+                    'analysis_id': analysis.id
+                })
+            else:
+                return Response({'error': 'Failed to analyze symptoms'}, status=500)
+                
+        except Exception as e:
+            # Fallback to basic analysis if AI fails
+            classification = 'unrelated'
+            confidence = 0.5
+            ai_analysis = "Basic analysis - Please consult a healthcare professional"
+            recommendations = ["Consult with a healthcare professional for proper diagnosis"]
+            
+            analysis = SymptomAnalysis.objects.create(
+                user=request.user,
+                symptoms=symptoms,
+                classification=classification,
+                confidence_score=confidence,
+                ai_analysis=ai_analysis,
+                recommendations='\n'.join(recommendations)
+            )
         
         return Response({
             'classification': classification,
@@ -228,43 +234,28 @@ def analyze_symptoms(request):
 @permission_classes([IsAuthenticated])
 def chat_with_ai(request):
     """
-    Chat with AI health assistant
+    Chat with AI health assistant using Gemini AI
     """
     serializer = ChatRequestSerializer(data=request.data)
     if serializer.is_valid():
         message = serializer.validated_data['message']
         message_type = serializer.validated_data['message_type']
         
-        # Simple AI response logic (should be enhanced with actual AI/LLM)
-        message_lower = message.lower()
+        # Get user context for better AI responses
+        user_allergies = list(Allergy.objects.filter(user=request.user).values_list('name', flat=True))
+        user_medications = list(Medication.objects.filter(user=request.user).values_list('name', flat=True))
         
-        # Generate contextual responses based on message type and content
-        if 'allergy' in message_lower or 'allergic' in message_lower:
-            responses = [
-                "I understand you're asking about allergies. It's important to keep track of all known allergies and always inform healthcare providers.",
-                "Allergic reactions can range from mild to severe. If you suspect a new allergy, please consult with a healthcare professional for proper testing.",
-                "Common allergy symptoms include rashes, itching, swelling, and difficulty breathing. Severe reactions require immediate medical attention."
-            ]
-        elif 'medication' in message_lower or 'drug' in message_lower:
-            responses = [
-                "When starting new medications, always check with your pharmacist or doctor about potential interactions with your current medications.",
-                "It's important to take medications exactly as prescribed and report any side effects to your healthcare provider.",
-                "Never stop taking prescribed medications without consulting your doctor first, even if you feel better."
-            ]
-        elif 'emergency' in message_lower or 'help' in message_lower:
-            responses = [
-                "If this is a medical emergency, please call emergency services immediately. I'm here to provide general health information, not emergency care.",
-                "For urgent health concerns, contact your doctor or visit the nearest emergency room. I can help with general health questions.",
-            ]
-        else:
-            responses = [
-                "I'm here to help with your health questions. Feel free to ask about allergies, medications, or general health concerns.",
-                "For personalized medical advice, always consult with qualified healthcare professionals. I can provide general information to help you stay informed.",
-                "Remember to keep your health information updated in the app so I can provide more relevant guidance.",
-            ]
-        
-        # Select a random response or use simple keyword matching for more specific responses
-        response_text = random.choice(responses)
+        # Use AI for intelligent health assistance
+        try:
+            ai_service = GeminiAIService()
+            response_text = ai_service.chat_health_assistant(message, user_allergies, user_medications)
+            
+            if not response_text:
+                response_text = "I'm here to help with your health questions. Please try rephrasing your question or consult a healthcare professional for specific medical advice."
+                
+        except Exception as e:
+            # Fallback response if AI fails
+            response_text = "I'm currently unable to provide a detailed response. For important health questions, please consult with a healthcare professional."
         
         # Save the chat message
         chat_message = ChatMessage.objects.create(
