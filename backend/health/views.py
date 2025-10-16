@@ -231,7 +231,7 @@ def analyze_symptoms(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([])  # Allow unauthenticated access for development
 def chat_with_ai(request):
     """
     Chat with AI health assistant using Gemini AI
@@ -241,9 +241,12 @@ def chat_with_ai(request):
         message = serializer.validated_data['message']
         message_type = serializer.validated_data['message_type']
         
-        # Get user context for better AI responses
-        user_allergies = list(Allergy.objects.filter(user=request.user).values_list('name', flat=True))
-        user_medications = list(Medication.objects.filter(user=request.user).values_list('name', flat=True))
+        # Get user context for better AI responses (if user is authenticated)
+        user_allergies = []
+        user_medications = []
+        if request.user.is_authenticated:
+            user_allergies = list(Allergy.objects.filter(user=request.user).values_list('name', flat=True))
+            user_medications = list(Medication.objects.filter(user=request.user).values_list('name', flat=True))
         
         # Use AI for intelligent health assistance
         try:
@@ -257,18 +260,21 @@ def chat_with_ai(request):
             # Fallback response if AI fails
             response_text = "I'm currently unable to provide a detailed response. For important health questions, please consult with a healthcare professional."
         
-        # Save the chat message
-        chat_message = ChatMessage.objects.create(
-            user=request.user,
-            message=message,
-            response=response_text,
-            message_type=message_type
-        )
+        # Save the chat message (only if user is authenticated)
+        message_id = None
+        if request.user.is_authenticated:
+            chat_message = ChatMessage.objects.create(
+                user=request.user,
+                message=message,
+                response=response_text,
+                message_type=message_type
+            )
+            message_id = chat_message.id
         
         return Response({
             'response': response_text,
             'message_type': message_type,
-            'message_id': chat_message.id
+            'message_id': message_id
         })
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
