@@ -8,10 +8,11 @@ import {
   Alert,
   ActivityIndicator,
   StyleSheet,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { healthApi, DrugRiskAnalysisResult } from '@/services/healthApi';
+import { AppTheme } from '@/constants/AppTheme';
 
 interface DrugRiskAnalysisProps {
   onClose?: () => void;
@@ -29,14 +30,16 @@ const DrugRiskAnalysis: React.FC<DrugRiskAnalysisProps> = ({ onClose, initialDru
     loadUserAllergies();
   }, []);
 
-  const loadUserAllergies = async () => {
-    try {
-      const profile = await healthApi.getUserProfile();
-      setUserAllergies(profile.allergies || []);
-    } catch (error) {
-      console.error('Failed to load user allergies:', error);
-    }
-  };
+    const loadUserAllergies = async () => {
+      try {
+        const profile = await healthApi.getUserProfile();
+        setUserAllergies(profile.allergies || []);
+      } catch (error) {
+        console.error('Failed to load user allergies:', error);
+        // Fallback: show empty allergies and continue
+        setUserAllergies([]);
+      }
+    };
 
   const analyzeDrugRisk = async () => {
     if (!drugName.trim()) {
@@ -67,10 +70,10 @@ const DrugRiskAnalysis: React.FC<DrugRiskAnalysisProps> = ({ onClose, initialDru
 
   const getRiskColor = (riskLevel: string) => {
     switch (riskLevel) {
-      case 'high': return '#FF4444';
-      case 'medium': return '#FFA500';
-      case 'low': return '#4CAF50';
-      default: return '#666';
+      case 'high': return AppTheme.colors.danger;
+      case 'medium': return AppTheme.colors.warning;
+      case 'low': return AppTheme.colors.success;
+      default: return AppTheme.colors.mediumGray;
     }
   };
 
@@ -220,17 +223,6 @@ const DrugRiskAnalysis: React.FC<DrugRiskAnalysisProps> = ({ onClose, initialDru
                   </View>
                 ))}
               </View>
-
-              {/* AI Analysis */}
-              {result.ai_analysis && (
-                <View style={styles.aiAnalysisContainer}>
-                  <View style={styles.aiHeader}>
-                    <MaterialIcons name="psychology" size={16} color="#8B5CF6" />
-                    <Text style={styles.aiLabel}>AI Analysis</Text>
-                  </View>
-                  <Text style={styles.aiAnalysisText}>{result.ai_analysis}</Text>
-                </View>
-              )}
             </View>
 
             {/* Medical Disclaimer */}

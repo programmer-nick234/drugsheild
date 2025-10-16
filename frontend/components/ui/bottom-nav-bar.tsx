@@ -30,16 +30,16 @@ const tabs: TabItem[] = [
     label: 'Symptoms'
   },
   {
-    name: 'summary',
-    icon: '△',
-    route: '/health-summary',
-    label: 'Summary'
-  },
-  {
     name: 'chat',
     icon: '◐',
     route: '/chat-bot',
     label: 'AI Chat'
+  },
+  {
+    name: 'profile',
+    icon: '●',
+    route: '/profile',
+    label: 'Profile'
   }
 ];
 

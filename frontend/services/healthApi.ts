@@ -222,7 +222,17 @@ export const healthApi = {
       
       return profile;
     } catch (error: any)  {
-      throw new Error(error.response?.data?.error || 'Failed to fetch user profile');
+      // Silently fallback to guest profile when backend is unavailable
+      console.debug('Backend unavailable, using guest profile:', error.message);
+      return {
+        id: 'guest',
+        name: 'Guest User',
+        age: 0,
+        gender: 'other' as 'male' | 'female' | 'other',
+        allergies: [],
+        diseases: [],
+        medications: []
+      };
     }
   },
 
